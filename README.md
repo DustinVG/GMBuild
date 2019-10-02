@@ -20,3 +20,7 @@ Compile and run GMStudio v1.4 projects in GMEdit
 * Only supports Windows VM target
 * Doesn't check if a project is loaded or not
 * Fails silently if any errors are thrown (use 'Dev Tools' [Ctrl+Shift+I] for debugging)
+
+**Credits**
+
+Thanks to Liam for the initial idea and helping to get things up and running, nommiin for laying a foundation for the structure of this project with [Builder](https://github.com/nommiin/builder), and of course YellowAfterlife for making GMEdit in the first place.
