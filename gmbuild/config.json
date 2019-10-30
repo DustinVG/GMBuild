@@ -1,4 +1,6 @@
 {
     "name": "gmbuild",
-    "scripts": ["gmbuild.js"]
+    "scripts": ["gmbuild.js"],
+    "stylesheets": [],
+    "dependencies": []
 }
