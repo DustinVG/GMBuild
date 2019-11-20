@@ -1,9 +1,9 @@
-# GMBuild
+# GMBuild (DEV BUILD)
 Compile and run GMStudio v1.4 projects in GMEdit
 
 ![GMBuild section](https://raw.githubusercontent.com/kbjwes77/GMBuild/master/gmbuild.jpg)
 
-**How To Use**
+**How To Use** (At this point in time, some additional changes may need to be made for GMBuild to work with your specific hardware/installation)
 
 * Install the plugin and open GMEdit
 * Go to preferences and find the GMBuild section
