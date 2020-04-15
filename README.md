@@ -1,5 +1,5 @@
 # GMBuild (DEV BUILD)
-Compile and run GMStudio v1.4 projects in GMEdit
+Debug & Run GMStudio v1.4 projects from within GMEdit
 
 ![GMBuild section](https://raw.githubusercontent.com/kbjwes77/GMBuild/master/gmbuild.jpg)
 
