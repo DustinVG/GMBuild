@@ -13,11 +13,11 @@ Debug & Run GMStudio v1.4 projects from within GMEdit
 **Planned Features**
 
 * Custom command line arguments for compiler
-* Custom runner/compiler output window
+* Support for compiling with YYC
+* ~~Custom runner/compiler output window~~
 
 **Known Issues**
 
-* Only supports Windows VM target
 * Doesn't check if a project is loaded or not
 * Fails silently if any errors are thrown (use 'Dev Tools' [Ctrl+Shift+I] for debugging)
 
