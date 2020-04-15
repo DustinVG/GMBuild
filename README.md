@@ -1,9 +1,9 @@
-# GMBuild
-Compile and run GMStudio v1.4 projects in GMEdit
+# GMBuild (DEV BUILD)
+Debug & Run GMStudio v1.4 projects from within GMEdit
 
 ![GMBuild section](https://raw.githubusercontent.com/kbjwes77/GMBuild/master/gmbuild.jpg)
 
-**How To Use**
+**How To Use** (At this point in time, some additional changes may need to be made for GMBuild to work with your specific hardware/installation)
 
 * Install the plugin and open GMEdit
 * Go to preferences and find the GMBuild section
@@ -13,11 +13,11 @@ Compile and run GMStudio v1.4 projects in GMEdit
 **Planned Features**
 
 * Custom command line arguments for compiler
-* Custom runner/compiler output window
+* Support for compiling with YYC
+* ~~Custom runner/compiler output window~~
 
 **Known Issues**
 
-* Only supports Windows VM target
 * Doesn't check if a project is loaded or not
 * Fails silently if any errors are thrown (use 'Dev Tools' [Ctrl+Shift+I] for debugging)
 
