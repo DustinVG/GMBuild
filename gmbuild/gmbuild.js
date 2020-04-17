@@ -1,6 +1,10 @@
+const { spawn } = require("child_process");
+//const fs = require('fs');
+
 gmbuild = {
 	menu_index: -1,
 	compiled: false,
+	runner_process: null,
 
 	// preferences
 	preferences_path: Electron_App.getPath("userData") + "/GMEdit/config/gmbuild-preferences.json",
@@ -25,96 +29,68 @@ gmbuild = {
 		}
 
 		// create div on main ui for YYC (not yet implemented)
-		/*div_element = document.createElement("div");
-		div_element.innerText = "Use YYC";
-		document.getElementById("misc-td").appendChild(div_element);
-		
+		element = document.createElement("span");
+		element.innerText = "Use YYC";
+		element.style.borderLeft = "1px solid #bbb";
+		element.style.paddingLeft = "8px";
+		document.getElementsByClassName("ace_status-bar")[0].appendChild(element);
 		yyc_checkbox_element = document.createElement("INPUT");
 		yyc_checkbox_element.setAttribute("type", "checkbox");
 		yyc_checkbox_element.id = "yyc_checkbox";
-		div_element.appendChild(yyc_checkbox_element);*/
+		element.appendChild(yyc_checkbox_element);
 
-		div_element = document.createElement("span");
-		div_element.innerText = "Use Debugger";
-		div_element.style.borderLeft = "1px solid #bbb";
-		div_element.style.paddingLeft = "5px";
-
-		document.getElementsByClassName("ace_status-bar")[0].appendChild(div_element);
-
+		// create debugger toggle
+		element = document.createElement("span");
+		element.innerText = "Use Debugger";
+		element.style.borderLeft = "1px solid #bbb";
+		element.style.paddingLeft = "8px";
+		document.getElementsByClassName("ace_status-bar")[0].appendChild(element);
 		debugger_checkbox_element = document.createElement("INPUT");
 		debugger_checkbox_element.setAttribute("type", "checkbox");
 		debugger_checkbox_element.id = "debug_checkbox";
-		div_element.appendChild(debugger_checkbox_element);
+		element.appendChild(debugger_checkbox_element);
 	},
 
-	// run
-	run: function () {
-		if (!gmbuild.compiled) {
-			return false;
-		}
-
-		const { spawn } = require("child_process");
-
-		// project info
-		let projectname = $gmedit["gml.Project"].current.displayName;
-		// directories
-		let tempdir = Electron_App.getPath("temp");
-		let outputdir = tempdir + '/GMEdit/' + projectname + '/output';
-		let gamedir = '"' + outputdir + '/' + $gmedit["gml.Project"].current.displayName + '.win' + '"';
-
-		// execute runner
-		const runner_process = spawn(gmbuild.preferences.runner_location, ['-game', outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win"]);
-
-		// debugger
-		if (document.getElementById("debug_checkbox").checked) {
-			const debugger_process = spawn(gmbuild.preferences.debugger_location,
-				['-d', outputdir + "/" + $gmedit["gml.Project"].current.displayName + '.yydebug',
-					'-t', '127.0.0.1',
-					'-u', gmbuild.preferences.debugger_xml_location,
-					'-p', $gmedit["gml.Project"].current.path,
-					'-c', "Default",
-					'-ac', gmbuild.preferences.compiler_location,
-					'-tp', 6502]);
-
-			// send debugger output to dev console
-			debugger_process.stdout.on('data', (data) => {
-				console.divlog(`DEBUGGER: ${data}`);
-			});
-		}
-
-		// send runner output to dev console
-		runner_process.stdout.on('data', (data) => {
-			console.divlog(`RUNNER: ${data}`);
-		});
-
-		return true;
-	},
-
-	// compile
+	// saves all open files and starts the asset compiler
 	build: function (execRunner) {
+
 		gmbuild.compiled = false;
+
+		// exit if we cant build
+		if ($gmedit["gml.Project"].current.version.isReady == false) { console.divlog("Can't build without a loaded project."); return false; }
 
 		// save all before building
 		for (let tab of $gmedit["ui.ChromeTabs"].impl.tabEls) tab.gmlFile.save();
 
-		const { spawn } = require("child_process");
-
 		// project info
 		let projectname = $gmedit["gml.Project"].current.displayName;
 		// directories
 		let tempdir = Electron_App.getPath("temp");
 		let outputdir = tempdir + '/GMEdit/' + projectname + '/output';
 
+		// yyc
+		let compile_to_vm = '/cvm';
+		let llvm_source = '';
+		let module_param = '/m=win';
+		if (document.getElementById("yyc_checkbox").checked) {
+			console.log("Using YYC");
+			llvm_source = '/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"';
+			module_param = '/m=llvm-win';
+			compile_to_vm = '';
+		}
+
 		// debug
 		let debug_param = '';
-		if (document.getElementById("debug_checkbox").checked) {
-			debug_param = '/debug';
-		}
+		if (document.getElementById("debug_checkbox").checked) { debug_param = '/debug'; }
+
+		// test if options is created
+		console.log('/optionsini="' + outputdir + '/options.ini"');
 
 		// execute compile
 		let build_process = spawn(gmbuild.preferences.compiler_location,
-			['/c',
-				'/m=win',
+			['/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"',
+				'/c',
+				module_param,
 				debug_param,
 				'/config', "Default",
 				'/tgt=64',
@@ -124,7 +100,7 @@ gmbuild = {
 				'/obes=False',
 				'/i=3',
 				'/j=8',
-				'/cvm',
+				compile_to_vm,
 				'/tp', 2048,
 				'/mv=1',
 				'/iv=0',
@@ -137,6 +113,8 @@ gmbuild = {
 				'/dbgp="6502"',
 				'/hip="192.168.1.2"',
 				'/hprt="51268"',
+				//'/optionsini="' + outputdir + '/options.ini"',
+				'/optionsini="C:/Users/liamn/Desktop/options.ini"',
 				'/o="' + outputdir + '"',
 				'"' + $gmedit["gml.Project"].current.path + '"']);
 
@@ -155,9 +133,56 @@ gmbuild = {
 		});
 	},
 
-	// run and compile
-	build_and_run: function () {
-		gmbuild.build(true);
+	// runs the application
+	run: function () {
+		// if not compiled yet, do not allow running
+		if (!gmbuild.compiled) { return false; }
+
+		// project info
+		let projectname = $gmedit["gml.Project"].current.displayName;
+		// directories
+		let tempdir = Electron_App.getPath("temp");
+		let outputdir = tempdir + '/GMEdit/' + projectname + '/output';
+		let gamedir = '"' + outputdir + '/' + $gmedit["gml.Project"].current.displayName + '.win' + '"';
+
+		// if a running process exists, kill it
+		if (gmbuild.runner_process != null) {
+			gmbuild.runner_process.kill();
+			delete runner_process;
+		}
+
+		// execute runner in from yyc directly or in runner
+		if (document.getElementById("yyc_checkbox").checked) {
+			console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
+			gmbuild.runner_process = spawn(outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
+		} else {
+			console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win");
+			gmbuild.runner_process = spawn(gmbuild.preferences.runner_location, ['-game', outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win"]);
+
+			// debugger
+			if (document.getElementById("debug_checkbox").checked) {
+				const debugger_process = spawn(gmbuild.preferences.debugger_location,
+					['-d', outputdir + "/" + $gmedit["gml.Project"].current.displayName + '.yydebug',
+						'-t', '127.0.0.1',
+						'-u', gmbuild.preferences.debugger_xml_location,
+						'-p', $gmedit["gml.Project"].current.path,
+						'-c', "Default",
+						'-ac', gmbuild.preferences.compiler_location,
+						'-tp', 6502]);
+
+				// send debugger output to dev console
+				debugger_process.stdout.on('data', (data) => {
+					console.divlog(`DEBUGGER: ${data}`);
+				});
+			}
+		}
+
+		// send runner output to dev console
+		gmbuild.runner_process.stdout.on('data', (data) => {
+			console.divlog(`RUNNER: ${data}`);
+		});
+
+		return true;
 	},
 
 	ParseDescriptor: function (string) {
@@ -225,7 +250,7 @@ gmbuild = {
 
 				// keyboard shortcuts
 				let AceCommands = $gmedit["ace.AceCommands"];
-				AceCommands.add({ name: "build", bindKey: "F5", exec: gmbuild.build_and_run }, "Build and run");
+				AceCommands.add({ name: "build", bindKey: "F5", exec: function () { gmbuild.build(true); } }, "Build and run");
 				AceCommands.addToPalette({ name: "gmbuild: Compile and run your project", exec: "build", title: "Build and run" });
 				AceCommands.add({ name: "run", bindKey: "F6", exec: gmbuild.run }, "Run last build");
 				AceCommands.addToPalette({ name: "gmbuild: Run your project", exec: "run", title: "Run" });
