@@ -1,19 +1,21 @@
 const { spawn } = require("child_process");
-//const fs = require('fs');
 
 gmbuild = {
 	menu_index: -1,
 	compiled: false,
 	runner_process: null,
+	target_module: "VM",
+	has_errors: false,
 
-	// preferences
+	// preference option initialization
 	preferences_path: Electron_App.getPath("userData") + "/GMEdit/config/gmbuild-preferences.json",
 	preferences_div: document.createElement("div"),
 	preferences: {
-		compiler_location: "",
-		runner_location: "",
-		debugger_location: "",
-		debugger_xml_location: ""
+		path_compiler: "",
+		path_runner: "",
+		path_debugger: "",
+		path_debug_xml: "",
+		path_options: ""
 	},
 	preferences_save: function () {
 		Electron_FS.writeFileSync(this.preferences_path, JSON.stringify(this.preferences));
@@ -29,15 +31,15 @@ gmbuild = {
 		}
 
 		// create div on main ui for YYC (not yet implemented)
-		element = document.createElement("span");
+		/*element = document.createElement("span");
 		element.innerText = "Use YYC";
 		element.style.borderLeft = "1px solid #bbb";
 		element.style.paddingLeft = "8px";
 		document.getElementsByClassName("ace_status-bar")[0].appendChild(element);
-		yyc_checkbox_element = document.createElement("INPUT");
+		yyc_checkbox_element = document.createElement("input");
 		yyc_checkbox_element.setAttribute("type", "checkbox");
 		yyc_checkbox_element.id = "yyc_checkbox";
-		element.appendChild(yyc_checkbox_element);
+		element.appendChild(yyc_checkbox_element);*/
 
 		// create debugger toggle
 		element = document.createElement("span");
@@ -45,22 +47,90 @@ gmbuild = {
 		element.style.borderLeft = "1px solid #bbb";
 		element.style.paddingLeft = "8px";
 		document.getElementsByClassName("ace_status-bar")[0].appendChild(element);
-		debugger_checkbox_element = document.createElement("INPUT");
+		debugger_checkbox_element = document.createElement("input");
 		debugger_checkbox_element.setAttribute("type", "checkbox");
 		debugger_checkbox_element.id = "debug_checkbox";
 		element.appendChild(debugger_checkbox_element);
+
+		// create module type dropdown
+		element = document.createElement("span");
+		element.innerText = "Module";
+		element.style.borderLeft = "1px solid #bbb";
+		element.style.paddingLeft = "8px";
+		document.getElementsByClassName("ace_status-bar")[0].appendChild(element);
+
+		module_dropdown_element = document.createElement("select");
+		module_dropdown_element.id = "module_select";
+		module_dropdown_element.style.borderLeft = "1px solid #bbb";
+		module_dropdown_element.style.paddingLeft = "8px";
+
+		option = document.createElement("option");
+		option.innerText = "VM";
+		module_dropdown_element.appendChild(option);
+
+		option = document.createElement("option");
+		option.innerText = "YYC";
+		module_dropdown_element.appendChild(option);
+
+		option = document.createElement("option");
+		option.innerText = "WEB";
+		module_dropdown_element.appendChild(option);
+
+		element.appendChild(module_dropdown_element);
+
+		// hook into error linter to allow for the checking of errors directly
+		console.log($gmedit["parsers.linter.GmlLinter"].prototype.addError);
+
+		$gmedit["parsers.linter.GmlLinter"].prototype.setError = (function () {
+			var cached_function = $gmedit["parsers.linter.GmlLinter"].prototype.setError;
+
+			return function () {
+
+				var result = cached_function.apply(this, arguments); // use .apply() to call it
+
+				gmbuild.has_errors = (this.errorText != "");
+				console.log("Has errors: ", gmbuild.has_errors);
+
+				return result;
+			};
+		})();
+
+		$gmedit["parsers.linter.GmlLinter"].prototype.addError = (function () {
+			var cached_function = $gmedit["parsers.linter.GmlLinter"].prototype.addError;
+
+			return function () {
+
+				var result = cached_function.apply(this, arguments); // use .apply() to call it
+
+				gmbuild.has_errors = gmbuild.has_errors || (this.errors.length > 0);
+				console.log("Has errors: ", gmbuild.has_errors);
+
+				return result;
+			};
+		})();
 	},
 
 	// saves all open files and starts the asset compiler
 	build: function (execRunner) {
+
+		target_module = document.getElementById("module_select").value;
+
+		var console_div_node = document.getElementById('console_div');
+		console_div_node.innerHTML = "";
 
 		gmbuild.compiled = false;
 
 		// exit if we cant build
 		if ($gmedit["gml.Project"].current.version.isReady == false) { console.divlog("Can't build without a loaded project."); return false; }
 
+		// reset the check for errors
+		gmbuild.has_errors = false;
+
 		// save all before building
-		for (let tab of $gmedit["ui.ChromeTabs"].impl.tabEls) tab.gmlFile.save();
+		for (let tab of $gmedit["ui.ChromeTabs"].impl.tabEls) { tab.gmlFile.save(); }
+
+		// check for errors
+		if (gmbuild.has_errors) { return; }
 
 		// project info
 		let projectname = $gmedit["gml.Project"].current.displayName;
@@ -68,15 +138,18 @@ gmbuild = {
 		let tempdir = Electron_App.getPath("temp");
 		let outputdir = tempdir + '/GMEdit/' + projectname + '/output';
 
-		// yyc
+		// yyc and html5
 		let compile_to_vm = '/cvm';
 		let llvm_source = '';
 		let module_param = '/m=win';
-		if (document.getElementById("yyc_checkbox").checked) {
+		if (target_module == "YYC") {
 			console.log("Using YYC");
 			llvm_source = '/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"';
 			module_param = '/m=llvm-win';
 			compile_to_vm = '';
+		} else if (target_module == "WEB") {
+			console.log("Using HTML5");
+			module_param = '/m=html5';
 		}
 
 		// debug
@@ -86,37 +159,50 @@ gmbuild = {
 		// test if options is created
 		console.log('/optionsini="' + outputdir + '/options.ini"');
 
+		console.log("Current path_options", gmbuild.preferences.path_options);
+
+		// build param array
+		let build_params = ['/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"'];
+		build_params.push('/c');
+		build_params.push(module_param);
+		if (target_module == "WEB") {
+			build_params.push(
+				'/nodnd',
+				'/obfuscate',
+				'/wt',
+				'/html5folder="js"',
+				'/nocache_html5',
+				'/HTMLRunner="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/scripts.html5.zip"');
+		}
+		build_params.push(debug_param);
+		build_params.push('/config');
+		build_params.push("Default");
+		build_params.push('/tgt=64');
+		build_params.push('/obob=True');
+		build_params.push('/obpp=False');
+		build_params.push('/obru=True');
+		build_params.push('/obes=False');
+		build_params.push('/i=3');
+		build_params.push('/j=8');
+		build_params.push(compile_to_vm);
+		build_params.push('/tp', 2048);
+		build_params.push('/mv=1');
+		build_params.push('/iv=0');
+		build_params.push('/rv=0');
+		build_params.push('/bv=9999');
+		build_params.push('/gn="' + projectname + '"');
+		build_params.push('/td="' + tempdir + '/GMEdit/' + projectname + '"');
+		build_params.push('/cd', tempdir + '/GMEdit/' + projectname + '/cachedir');
+		build_params.push('/sh=True');
+		build_params.push('/dbgp="6502"');
+		build_params.push('/hip="192.168.1.17"');
+		build_params.push('/hprt="51268"');
+		build_params.push('/optionsini="' + gmbuild.preferences.path_options + '"');
+		build_params.push('/o="' + outputdir + '"');
+		build_params.push('"' + $gmedit["gml.Project"].current.path + '"');
+
 		// execute compile
-		let build_process = spawn(gmbuild.preferences.compiler_location,
-			['/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"',
-				'/c',
-				module_param,
-				debug_param,
-				'/config', "Default",
-				'/tgt=64',
-				'/obob=True',
-				'/obpp=False',
-				'/obru=True',
-				'/obes=False',
-				'/i=3',
-				'/j=8',
-				compile_to_vm,
-				'/tp', 2048,
-				'/mv=1',
-				'/iv=0',
-				'/rv=0',
-				'/bv=9999',
-				'/gn="' + projectname + '"',
-				'/td="' + tempdir + '/GMEdit/' + projectname + '"',
-				'/cd', tempdir + '/GMEdit/' + projectname + '/cachedir',
-				'/sh=True',
-				'/dbgp="6502"',
-				'/hip="192.168.1.2"',
-				'/hprt="51268"',
-				//'/optionsini="' + outputdir + '/options.ini"',
-				'/optionsini="C:/Users/liamn/Desktop/options.ini"',
-				'/o="' + outputdir + '"',
-				'"' + $gmedit["gml.Project"].current.path + '"']);
+		let build_process = spawn(gmbuild.preferences.compiler_location, build_params);
 
 		// send compiler output to dev console
 		build_process.stdout.on('data', (data) => {
@@ -151,30 +237,35 @@ gmbuild = {
 			delete runner_process;
 		}
 
-		// execute runner in from yyc directly or in runner
-		if (document.getElementById("yyc_checkbox").checked) {
-			console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
-			gmbuild.runner_process = spawn(outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
-		} else {
-			console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win");
-			gmbuild.runner_process = spawn(gmbuild.preferences.runner_location, ['-game', outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win"]);
+		switch (target_module) {
+			case "VM":
+				console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win");
+				gmbuild.runner_process = spawn(gmbuild.preferences.path_runner, ['-game', outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win"]);
 
-			// debugger
-			if (document.getElementById("debug_checkbox").checked) {
-				const debugger_process = spawn(gmbuild.preferences.debugger_location,
-					['-d', outputdir + "/" + $gmedit["gml.Project"].current.displayName + '.yydebug',
-						'-t', '127.0.0.1',
-						'-u', gmbuild.preferences.debugger_xml_location,
-						'-p', $gmedit["gml.Project"].current.path,
-						'-c', "Default",
-						'-ac', gmbuild.preferences.compiler_location,
-						'-tp', 6502]);
+				// debugger
+				if (document.getElementById("debug_checkbox").checked) {
+					const debugger_process = spawn(gmbuild.preferences.path_debugger,
+						['-d', outputdir + "/" + $gmedit["gml.Project"].current.displayName + '.yydebug',
+							'-t', '127.0.0.1',
+							'-u', gmbuild.preferences.path_debug_xml,
+							'-p', $gmedit["gml.Project"].current.path,
+							'-c', "Default",
+							'-ac', gmbuild.preferences.path_compiler,
+							'-tp', 6502]);
 
-				// send debugger output to dev console
-				debugger_process.stdout.on('data', (data) => {
-					console.divlog(`DEBUGGER: ${data}`);
-				});
-			}
+					// send debugger output to dev console
+					debugger_process.stdout.on('data', (data) => {
+						console.divlog(`DEBUGGER: ${data}`);
+					});
+				}
+				break;
+			case "YYC":
+				console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
+				gmbuild.runner_process = spawn(outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
+				break;
+			case "WEB":
+				gmbuild.runner_process = spawn("C:/Users/liamn/AppData/Roaming/AceGM/GMEdit/plugins/gmbuild/webserver-win.exe", ["--folder", outputdir + '/']);
+				break;
 		}
 
 		// send runner output to dev console
@@ -234,10 +325,11 @@ gmbuild = {
 				// preferences
 				let pref = $gmedit["ui.Preferences"];
 				pref.addText(gmbuild.preferences_div, "").innerHTML = "<b>GMBuild Settings</b>";
-				pref.addInput(gmbuild.preferences_div, "GMAssetCompiler location", gmbuild.preferences.compiler_location, (value) => { gmbuild.preferences.compiler_location = value; gmbuild.preferences_save(); });
-				pref.addInput(gmbuild.preferences_div, "Runner location", gmbuild.preferences.runner_location, (value) => { gmbuild.preferences.runner_location = value; gmbuild.preferences_save(); });
-				pref.addInput(gmbuild.preferences_div, "Debugger location", gmbuild.preferences.debugger_location, (value) => { gmbuild.preferences.debugger_location = value; gmbuild.preferences_save(); });
-				pref.addInput(gmbuild.preferences_div, "Debugger XML location (optional)", gmbuild.preferences.debugger_xml_location, (value) => { gmbuild.preferences.debugger_xml_location = value; gmbuild.preferences_save(); });
+				pref.addInput(gmbuild.preferences_div, "GMAssetCompiler location", gmbuild.preferences.path_compiler, (value) => { gmbuild.preferences.path_compiler = value; gmbuild.preferences_save(); });
+				pref.addInput(gmbuild.preferences_div, "Runner location", gmbuild.preferences.path_runner, (value) => { gmbuild.preferences.path_runner = value; gmbuild.preferences_save(); });
+				pref.addInput(gmbuild.preferences_div, "Debugger location", gmbuild.preferences.path_debugger, (value) => { gmbuild.preferences.path_debugger = value; gmbuild.preferences_save(); });
+				pref.addInput(gmbuild.preferences_div, "Debugger XML location (optional)", gmbuild.preferences.path_debug_xml, (value) => { gmbuild.preferences.path_debug_xml = value; gmbuild.preferences_save(); });
+				pref.addInput(gmbuild.preferences_div, "Options location `options.ini` (required for YYC)", gmbuild.preferences.path_options, (value) => { gmbuild.preferences.path_options = value; gmbuild.preferences_save(); });
 				pref.addButton(gmbuild.preferences_div, "Back", () => { pref.setMenu(pref.menuMain); gmbuild.preferences_save(); });
 				let buildMain = pref.buildMain;
 				pref.buildMain = function (arguments) {
@@ -261,6 +353,7 @@ gmbuild = {
 				node.id = "console_div";
 				document.getElementById("ace_container").appendChild(node);
 
+				// divlog function for logging runner and debugger
 				console.divlog = function (message) {
 					var console_div_node = document.getElementById('console_div');
 					var inner_node = document.createElement("div");
