@@ -229,7 +229,7 @@ gmbuild = {
 
 		switch (target_module) {
 			case "VM":
-				console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win");
+				console.divlog("Running executable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win");
 				gmbuild.runner_process = spawn(gmbuild.preferences.path_runner, ['-game', outputdir + "/" + $gmedit["gml.Project"].current.displayName + ".win"]);
 
 				// debugger
@@ -250,7 +250,7 @@ gmbuild = {
 				}
 				break;
 			case "YYC":
-				console.divlog("Running executeable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
+				console.divlog("Running executable from " + outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
 				gmbuild.runner_process = spawn(outputdir + "/" + $gmedit["gml.Project"].current.displayName.replace(/ /g, "_") + ".exe");
 				break;
 			case "WEB":
@@ -284,15 +284,31 @@ gmbuild = {
 	},
 
 	GetEvent: function (event) {
+
+		let SubEvent = event.slice(event.lastIndexOf("_") + 1);
+		let GmlEvent = $gmedit["parsers.GmlEvent"];
+		event = event.slice(0, event.lastIndexOf("_"));
+
+		switch (event) {
+			case "CreateEvent": return "create";
+			case "DestroyEvent": return "destroy";
+			case "Alarm": return "alarm" + real(SubEvent);
+			case "OtherGameStart": return "other_game_start";
+			case "StepNormalEvent": return "step";
+			default: console.warn(`No event found for event ${event}`);
+				return "";
+		}
+
 		// Turn descriptor event into GMEdit event name!
-		let SubEvent = event.slice(event.lastIndexOf("_") + 1), GmlEvent = $gmedit["parsers.GmlEvent"];
+		/*let SubEvent = event.slice(event.lastIndexOf("_") + 1);
+		let GmlEvent = $gmedit["parsers.GmlEvent"];
 		event = event.slice(0, event.lastIndexOf("_"));
 		for (let i = 0; i < GmlEvent.t2sc.length; i++) {
 			if (GmlEvent.t2sc[i] === event) {
 				return GmlEvent.i2s[i][SubEvent];
 			}
-		}
-		return "";
+		}*/
+
 	}
 };
 
@@ -359,43 +375,47 @@ gmbuild = {
 						for (let _i = 0; _i < lines.length; _i++) {
 							let line_string = lines[_i];
 							if (line_string.startsWith("stack frame is") === true) {
-								let stack_string = lines[_i + 1];
+								let stack_string = lines[_i + 1]; // stack_string = gml_Object_obj_menu_StepNormalEvent_1 (line 45);
 
 								let Descriptor = {};
-								if (stack_string.startsWith("gml_")) stack_string = stack_string.slice(4);
-								Descriptor.Type = stack_string.slice(0, stack_string.indexOf("_"));
-								stack_string = stack_string.slice(Descriptor.Type.length + 1);
-								Descriptor.Line = parseInt(stack_string.slice(stack_string.lastIndexOf("(") + 1, stack_string.lastIndexOf(")")).replace("line", ""));
-								stack_string = stack_string.slice(0, stack_string.lastIndexOf("(")).trim();
+								if (stack_string.startsWith("gml_")) stack_string = stack_string.slice(4); // stack_string <= Object_obj_menu_StepNormalEvent_1 (line 45);
+								Descriptor.Type = stack_string.slice(0, stack_string.indexOf("_")); // Descriptor.Type <= Object
+								stack_string = stack_string.slice(Descriptor.Type.length + 1); // stack_string <= obj_menu_StepNormalEvent_1 (line 45);
+								Descriptor.Line = parseInt(stack_string.slice(stack_string.lastIndexOf("(") + 1, stack_string.lastIndexOf(")")).replace("line", "")); // Descriptor.Line <= 45;
+								stack_string = stack_string.slice(0, stack_string.lastIndexOf("(")).trim(); // stack_string <= obj_menu_StepNormalEvent_1
 								if (Descriptor.Type === "Object") {
-									Descriptor.Event = stack_string.slice(stack_string.lastIndexOf("_", stack_string.lastIndexOf("_") - 1) + 1);
-									stack_string = stack_string.slice(0, (Descriptor.Event.length * -1) - 1);
+									let _underscore_last_index = stack_string.lastIndexOf("_");
+									let _underscore_beforelast_index = stack_string.lastIndexOf("_", _underscore_last_index - 1);
+									Descriptor.Event = stack_string.slice(_underscore_beforelast_index + 1); // Descriptor.Event <= StepNormalEvent_1
+									stack_string = stack_string.slice(0, (Descriptor.Event.length * -1) - 1); // stack_string <= obj_menu
 								}
-								Descriptor.Asset = stack_string;
+								Descriptor.Asset = stack_string; // Descriptor.Asset <= obj_menu
 
 								console.log(Descriptor);
 
 								Stack = Descriptor;
 
+								// set styling and click function for error div
 								inner_node.setAttribute("style", "color: #FF8080;");
-								inner_node.onclick = function () {
+								inner_node.onclick = () => {
 
-									if ($gmedit["ui.OpenDeclaration"].openLocal(Stack.Asset, Stack.Line) === true) {
-										setTimeout(() => {
-											let Offset = 0;
-											if (Stack.Type === "Object") {
-												for (let Event = gmbuild.GetEvent(Stack.Event), k = 0; k < aceEditor.session.getLength(); k++) {
-													if (aceEditor.session.getLine(k).startsWith("#event " + Event) === true) {
-														Offset = ++k;
-														break;
-													}
-												}
+									let Offset = 0;
+									if (Stack.Type == "Object") {
+										let Event = gmbuild.GetEvent(Stack.Event);
+										console.log(`Event: ${Event}`);
+
+
+										// loop through all lines of open document
+										for (k = 0; k < aceEditor.session.getLength(); k++) {
+											if (aceEditor.session.getLine(k).startsWith("#event " + Event) === true) {
+												Offset = ++k;
+												break;
 											}
-											aceEditor.gotoLine(Stack.Line + Offset);
-										}, 10);
+										}
 									}
-
+									aceEditor.scrollToLine(Stack.Line + Offset,true,true,null);
 								}
+
 							}
 						}
 					}
@@ -409,14 +429,14 @@ gmbuild = {
 						console.olog = console.log;
 					else
 						console.olog = function () { };
-
+	
 				console.log = function (message) {
 					console.olog(message);
 					let console_div_node = document.getElementById('console_div');
 					console_div_node.innerHTML += message + '<br>';
 					console_div_node.scrollTop = console_div_node.scrollHeight;
 				};
-
+	
 				console.error = console.debug = console.info = console.log;
 				*/
 			}
