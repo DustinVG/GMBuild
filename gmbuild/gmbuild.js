@@ -5,7 +5,7 @@ gmbuild = {
 	compiled_without_error: false,
 	runner_process: null,
 	target_module: "VM",
-	has_errors: false,
+	has_errors: true,
 
 	// preference option initialization
 	preferences_path: Electron_App.getPath("userData") + "/GMEdit/config/gmbuild-preferences.json",
@@ -145,34 +145,34 @@ gmbuild = {
 				'/HTMLRunner="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/scripts.html5.zip"');
 		}
 		build_params.push(debug_param);
-		build_params.push('/config="Default"');
-		build_params.push('/tgt=64');
-		build_params.push('/obob=True');
-		build_params.push('/obpp=False');
-		build_params.push('/obru=True');
-		build_params.push('/obes=False');
-		build_params.push('/i=3');
-		build_params.push('/j=8');
+		build_params.push(' /config="Default"');
+		build_params.push(' /tgt=64');
+		build_params.push(' /obob=True');
+		build_params.push(' /obpp=False');
+		build_params.push(' /obru=True');
+		build_params.push(' /obes=False');
+		build_params.push(' /i=3');
+		build_params.push(' /j=8');
 		build_params.push(compile_to_vm);
-		build_params.push('/tp=2048');
-		build_params.push('/mv=1');
-		build_params.push('/iv=0');
-		build_params.push('/rv=0');
-		build_params.push('/bv=9999');
-		build_params.push('/gn="' + projectname + '"');
-		build_params.push('/td="' + tempdir + '/GMEdit/' + projectname + '"');
-		build_params.push('/cd', tempdir + '/GMEdit/' + projectname + '/cachedir');
-		build_params.push('/sh=True');
-		build_params.push('/dbgp="6502"');
-		build_params.push('/hip="192.168.1.184"');
-		build_params.push('/hprt="51268"');
-		build_params.push('/optionsini="' + gmbuild.preferences.path_options + '"');
-		build_params.push('/o="' + outputdir + '"');
-		build_params.push('"' + $gmedit["gml.Project"].current.path + '"');
+		build_params.push(' /tp=2048');
+		build_params.push(' /mv=1');
+		build_params.push(' /iv=0');
+		build_params.push(' /rv=0');
+		build_params.push(' /bv=9999');
+		build_params.push(' /gn="' + projectname + '"');
+		build_params.push(' /td="' + tempdir + '/GMEdit/' + projectname + '"');
+		build_params.push(' /cd', tempdir + '/GMEdit/' + projectname + '/cachedir');
+		build_params.push(' /sh=True');
+		build_params.push(' /dbgp="6502"');
+		build_params.push(' /hip="192.168.1.184"');
+		build_params.push(' /hprt="51268"');
+		build_params.push(' /optionsini="' + gmbuild.preferences.path_options + '"');
+		build_params.push(' /o="' + outputdir + '"');
+		build_params.push(' "' + $gmedit["gml.Project"].current.path + '"');
 
 		// execute compile
 		gmbuild.compiled_without_error = true;
-		let build_process = spawn(gmbuild.preferences.compiler_location, build_params);
+		let build_process = spawn(gmbuild.preferences.path_compiler, build_params);
 
 		// send compiler output to dev console
 		build_process.stdout.on('data', (data) => {
