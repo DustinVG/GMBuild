@@ -17,7 +17,8 @@ gmbuild = {
 		path_runner: "",
 		path_webserver: "",
 		path_debugger: "",
-		path_debug_xml: ""
+		path_debug_xml: "",
+		path_yyc: ""
 	},
 
 	preferences_save: function () { Electron_FS.writeFileSync(this.preferences_path, JSON.stringify(this.preferences)); },
@@ -112,7 +113,7 @@ gmbuild = {
 
 		// module parameter switching
 		let compile_to_vm = target_module === "YYC" ? '' : '/cvm';
-		let llvm_source = target_module === "YYC" ? '' : '/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"';
+		let llvm_source = target_module === "YYC" ? '' : '/llvmSource=' + gmbuild.preferences.path_yyc;
 		let module_param = '/m=win';
 		if (target_module === "YYC") {
 			console.log("Using YYC");
@@ -132,7 +133,7 @@ gmbuild = {
 
 		// build param array
 		build_params = [];
-		if (target_module === "YYC") { build_params.push('/llvmSource="C:/Users/liamn/AppData/Roaming/GameMaker-Studio/YYC"'); };
+		if (target_module === "YYC") { build_params.push('/llvmSource='+gmbuild.preferences.path_yyc); };
 		build_params.push('/c');
 		build_params.push(module_param);
 		if (target_module === "WEB") {
@@ -339,16 +340,19 @@ gmbuild = {
 					});
 					return Return;
 				};
-
+				
 				// preferences - add inputs
 				pref.addText(gmbuild.preferences_div, "").innerHTML = "<b>GMBuild Settings</b>";
 				pref.addInput(gmbuild.preferences_div, "GMAssetCompiler location", gmbuild.preferences.path_compiler, (value) => { gmbuild.preferences.path_compiler = value; gmbuild.preferences_save(); });
-				pref.addInput(gmbuild.preferences_div, "Options location `options.ini` (required for YYC)", gmbuild.preferences.path_options, (value) => { gmbuild.preferences.path_options = value; gmbuild.preferences_save(); });
 				pref.addInput(gmbuild.preferences_div, "Output location", gmbuild.preferences.path_output, (value) => { gmbuild.preferences.path_output = value; gmbuild.preferences_save(); });
 				pref.addInput(gmbuild.preferences_div, "VM Runner location", gmbuild.preferences.path_runner, (value) => { gmbuild.preferences.path_runner = value; gmbuild.preferences_save(); });
 				pref.addInput(gmbuild.preferences_div, "HTML5 web server location", gmbuild.preferences.path_webserver, (value) => { gmbuild.preferences.path_webserver = value; gmbuild.preferences_save(); });
 				pref.addInput(gmbuild.preferences_div, "Debugger location", gmbuild.preferences.path_debugger, (value) => { gmbuild.preferences.path_debugger = value; gmbuild.preferences_save(); });
 				pref.addInput(gmbuild.preferences_div, "Debugger XML location (optional)", gmbuild.preferences.path_debug_xml, (value) => { gmbuild.preferences.path_debug_xml = value; gmbuild.preferences_save(); });
+				pref.addText(gmbuild.preferences_div, "").innerHTML = "<br><b>YoYo Compiler Settings</b>";
+				pref.addInput(gmbuild.preferences_div, "YYC folder location (Ex: C:/Users/(your name)/AppData/Roaming/GameMaker-Studio/YYC)", gmbuild.preferences.path_yyc, (value) => { gmbuild.preferences.path_yyc = value; gmbuild.preferences_save(); });
+				pref.addInput(gmbuild.preferences_div, "Options location `options.ini` (required for YYC)", gmbuild.preferences.path_options, (value) => { gmbuild.preferences.path_options = value; gmbuild.preferences_save(); });
+				pref.addText(gmbuild.preferences_div, "").innerHTML = "<br>";
 				pref.addButton(gmbuild.preferences_div, "Save Changes", () => { pref.setMenu(pref.menuMain); gmbuild.preferences_save(); });
 
 				// keyboard shortcuts

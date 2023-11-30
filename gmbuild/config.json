@@ -2,5 +2,6 @@
     "name": "gmbuild",
     "scripts": ["gmbuild.js"],
     "stylesheets": [],
+    "description": "Allows building and running of GMS1 projects from within GMEdit",
     "dependencies": []
 }
